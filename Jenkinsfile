@@ -7,37 +7,45 @@ pipeline {
     }
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
         stage('Install Dependencies') {
-            steps {
-                sh 'uv sync'
-            }
+            steps { sh 'uv sync' }
         }
         stage('Unit Tests') {
             steps {
-                sh 'uv run pytest test_app.py --cov=app --cov=main --cov-report=xml --junitxml=test-results/results.xml -v'
+                sh 'mkdir -p test-results'
+                sh '''
+                    uv run pytest test_app.py \
+                        --cov=app --cov=main \
+                        --cov-report=xml:coverage.xml \
+                        --junitxml=test-results/results.xml -v
+                '''
             }
             post {
-                always {
-                    junit 'test-results/results.xml'
+                always { junit 'test-results/results.xml' }
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarCloud') {
+                    script {
+                        def scannerHome = tool 'sonar-scanner'
+                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.token=${SONAR_TOKEN}"
+                    }
                 }
             }
         }
-                stage('SonarQube Analysis') {
+        stage('Quality Gate') {
             steps {
-                withSonarQubeEnv('SonarCloud') {
-                    sh 'sonar-scanner -Dsonar.login=${SONAR_TOKEN}'
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
         stage('Docker Build') {
             steps {
-                script {
-                    dockerImage = docker.build("${IMAGE}:${BUILD_NUMBER}")
-                }
+                script { dockerImage = docker.build("${IMAGE}:${BUILD_NUMBER}") }
             }
         }
         stage('Trivy Scan') {
@@ -74,10 +82,15 @@ pipeline {
         stage('Smoke Test') {
             steps {
                 sh '''
-                    sleep 10
-                    curl -f http://172.17.0.1:30080/ || (echo "Smoke test failed" && exit 1)
+                    sleep 15
+                    curl -f http://172.17.0.1:30080/ || (echo "Smoke test FAILED" && exit 1)
+                    echo "Smoke test PASSED ✅"
                 '''
             }
         }
+    }
+    post {
+        success { echo "✅ Pipeline completed successfully!" }
+        failure  { echo "❌ Pipeline failed. Check logs above." }
     }
 }
