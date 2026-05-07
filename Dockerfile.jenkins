@@ -3,7 +3,8 @@ FROM jenkins/jenkins:lts
 USER root
 
 RUN apt-get update && apt-get install -y \
-    curl unzip python3-pip apt-transport-https gnupg
+    curl unzip python3-pip apt-transport-https gnupg \
+    docker.io
 
 RUN curl -fsSL https://aquasecurity.github.io/trivy-repo/deb/public.key \
     | gpg --dearmor -o /usr/share/keyrings/trivy.gpg && \
@@ -31,5 +32,7 @@ RUN curl -Lo /usr/local/bin/kubectl \
     chmod +x /usr/local/bin/kubectl
 
 RUN pip3 install ansible --break-system-packages
+
+RUN usermod -aG docker jenkins
 
 USER jenkins
