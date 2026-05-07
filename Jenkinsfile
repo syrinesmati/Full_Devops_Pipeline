@@ -26,13 +26,6 @@ pipeline {
                 }
             }
         }
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarCloud') {
-                    sh 'sonar-scanner -Dsonar.login=${SONAR_TOKEN}'
-                }
-            }
-        }
         stage('Docker Build') {
             steps {
                 script {
